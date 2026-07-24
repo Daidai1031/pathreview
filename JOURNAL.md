@@ -52,8 +52,7 @@ above), so this issue is a realistic, well-scoped Tier 1 choice for me.
 
 ## Week 8 — Reproduction & solution planning
 
-**Reproduction commit link:** 
-https://github.com/Daidai1031/pathreview/commit/72ff229abf222e21c45b45471e2214fed405a217
+**Reproduction commit link:** https://github.com/Daidai1031/pathreview/commit/72ff229abf222e21c45b45471e2214fed405a217
 
 **Reproduction summary:**
 I ran the API locally and exercised both POST endpoints through the OpenAPI UI at
@@ -62,8 +61,7 @@ with an undocumented `resume_file` upload, while `POST /reviews` takes JSON — 
 `docs/API.md` describes both with identical one-line entries and no request format
 at all, so the two are indistinguishable to a reader.
 
-**PLAN.md link:** 
-https://github.com/Daidai1031/pathreview/blob/docs/89-add-post-request-body-schemas/PLAN.md
+**PLAN.md link:** https://github.com/Daidai1031/pathreview/blob/docs/89-add-post-request-body-schemas/PLAN.md
 
 **Walkthrough video (recommended):**
 
@@ -73,7 +71,12 @@ has neither requests nor responses — I need to confirm with the maintainer whe
 responses are in scope. Separately, two of the error paths I tested return 500 for
 what is clearly invalid client input; that looks like a bug in the handlers'
 exception handling, but it is a code change and I don't think it belongs in this
-docs issue.
+docs issue. Third, PDF resume uploads always fail with "Failed to parse PDF
+resume" — the handler passes raw bytes to `PyPDF2.PdfReader`, which needs a
+file-like object. That leaves an open question for the docs themselves: should
+`docs/API.md` list PDF as a supported resume format, when in practice it never
+works? I plan to document the allowlist as the code intends it, add a note about
+the current limitation, and open a separate issue for the bug.
 
 ---
 
@@ -178,6 +181,8 @@ required field, `profile_id: UUID`.
 | --- | --- | --- |
 | `POST /profiles` with no bearer token | 401 | `{"detail": "Not authenticated"}` |
 | `POST /profiles` with a `.docx` resume | 422 | `{"detail": "Resume must be a PDF or Markdown file"}` |
+| `POST /profiles` with a valid PDF resume | 422 | `{"detail": "Failed to parse PDF resume"}` |
+| `POST /profiles` with a Markdown resume | 200 | profile created, `resume_filename` populated |
 | `POST /profiles` with `github_username` over 255 chars | 500 | `{"detail": "Failed to create profile"}` |
 | `POST /reviews` with a nonexistent `profile_id` | 500 | `{"detail": "Failed to create review"}` |
 
@@ -200,6 +205,44 @@ differently.
 Fixing the 500s is a code change and outside the scope of #89. I will document the
 behavior as it currently stands, flag the discrepancy in the PR, and suggest a
 separate issue.
+
+#### PDF resume uploads always fail
+
+Uploading a valid PDF returns 422:
+
+```json
+{
+  "detail": "Failed to parse PDF resume"
+}
+```
+
+Uploading Markdown succeeds:
+
+```json
+{
+  "id": "a5cbcb29-6bf0-4373-80a0-e26a6fe9a854",
+  "user_id": "cc258f35-98a3-457b-b1bb-6fec6c95f9a9",
+  "github_username": "daidai1031",
+  "portfolio_url": "https://www.daidingrdesigns.com/",
+  "created_at": "2026-07-24T07:30:51.364782Z",
+  "resume_filename": "001-chunking-strategy.md"
+}
+```
+
+The two branches diverge in `create_profile_endpoint` (`api/routes/profiles.py`).
+Both start from `content = await resume_file.read()`, which returns `bytes`. The
+Markdown branch calls `content.decode("utf-8")`, which works on bytes. The PDF
+branch calls `PyPDF2.PdfReader(content)`, but `PdfReader` expects a file path or a
+file-like object — `bytes` has no `.seek()`, so the call raises, the surrounding
+`except Exception` catches it, and every PDF becomes a 422. Wrapping the bytes,
+`PdfReader(io.BytesIO(content))`, would be the usual fix.
+
+The practical effect is that the API advertises PDF support — the type allowlist
+accepts `application/pdf` and the rejection message names PDF first — while no PDF
+has ever been accepted. This is a code bug, not a docs bug, so it is outside the
+scope of #89. I searched the tracker and found no existing report; the closest is
+the closed #76, which covered the related 500-vs-422 behavior for non-PDF files.
+I plan to raise this separately rather than fold it into this PR.
 
 #### Why this counts as a reproduction
 

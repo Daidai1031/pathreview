@@ -116,6 +116,14 @@ and response body.
   but fixing it is a code change outside #89. Risk: documenting 500 as if it were
   intended behavior. Mitigation — document what the API actually does today, flag
   the discrepancy in the PR, and suggest a separate issue for the error handling.
+- **PDF is advertised but non-functional.** Verified: the type allowlist accepts
+  `application/pdf` and the rejection message names PDF first, yet no PDF upload
+  succeeds. Documenting "PDF or Markdown" without qualification would be
+  misleading; documenting "Markdown only" would contradict the code's intent. My
+  plan is to document the allowlist as written, add a short note that PDF parsing
+  currently fails, and open a separate issue for the bug — but I want the
+  maintainer's read on this before the PR, since it is a judgment call about what
+  the reference doc should describe: intended behavior or current behavior.
 - **Code/doc mismatch on allowed resume types.** The allowlist in
   `api/routes/profiles.py` includes `text/plain`, but the error message says "PDF
   or Markdown file". I will document observed behavior and note the inconsistency
@@ -139,9 +147,11 @@ The documentation must cover these so a reader is not surprised:
    with `{"detail": "Resume must be a PDF or Markdown file"}`. Worth contrasting
    with the two 500s below: this check raises `HTTPException` explicitly, so the
    handler's `except HTTPException: raise` branch passes it through intact.
-4. **A PDF that fails to parse** — also 422, but with a different detail,
-   "Failed to parse PDF resume"; worth listing separately so readers can tell the
-   two failures apart.
+4. **A PDF resume** — verified: *every* PDF returns 422 with
+   `{"detail": "Failed to parse PDF resume"}`, while Markdown returns 200. The PDF
+   branch in `create_profile_endpoint` passes raw `bytes` to `PyPDF2.PdfReader`,
+   which needs a file-like object. Readers must be able to tell this failure apart
+   from the wrong-file-type 422, which has a different detail string.
 5. **A missing, malformed, or expired bearer token** — verified: 401 with
    `{"detail": "Not authenticated"}` and a `www-authenticate: Bearer` header.
 6. **`github_username` longer than the 255-character limit** — verified: 500 with
