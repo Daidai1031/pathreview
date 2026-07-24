@@ -53,6 +53,7 @@ above), so this issue is a realistic, well-scoped Tier 1 choice for me.
 ## Week 8 — Reproduction & solution planning
 
 **Reproduction commit link:** 
+https://github.com/Daidai1031/pathreview/commit/72ff229abf222e21c45b45471e2214fed405a217
 
 **Reproduction summary:**
 I ran the API locally and exercised both POST endpoints through the OpenAPI UI at
@@ -62,6 +63,7 @@ with an undocumented `resume_file` upload, while `POST /reviews` takes JSON — 
 at all, so the two are indistinguishable to a reader.
 
 **PLAN.md link:** 
+https://github.com/Daidai1031/pathreview/blob/docs/89-add-post-request-body-schemas/PLAN.md
 
 **Walkthrough video (recommended):**
 
