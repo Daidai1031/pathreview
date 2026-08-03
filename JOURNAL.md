@@ -251,3 +251,79 @@ upload, one JSON — and `docs/API.md` describes them with structurally identica
 one-line entries that omit the distinction entirely. A developer working from the
 documentation alone cannot tell them apart, and the natural guess for `/profiles`
 is wrong. All four error responses are undocumented as well.
+
+---
+
+## Week 9 — Solution building & PR submission
+
+### Check-in 1 (mid-week)
+
+**Current progress:**
+Sub-tasks 1–2 from PLAN.md were already done in Week 8 (confirming the wire format
+for both endpoints and verifying the error paths against a running server). This
+week I completed sub-tasks 3–5: the `POST /profiles` request section in
+`docs/API.md` (content type `multipart/form-data`, a field table for
+`github_username`, `portfolio_url`, and the previously undocumented `resume_file`
+upload, plus a `curl -F` example), the `POST /reviews` request section
+(`application/json`, required `profile_id`, JSON and curl examples), and the
+authentication and error-response tables for both endpoints. I also recorded a
+baseline of the repo's existing failures before touching anything —
+53 failed / 375 passed on `make test-unit`, 182 ruff errors, 52 files unformatted
+under black, 5 mypy errors — so I can prove my change doesn't add to them.
+
+**Next steps:**
+Add a test that guards the new documentation against drifting from the request
+models, re-run the full check suite to confirm the failure counts are unchanged,
+open a draft PR, and get peer feedback before marking it ready for review.
+
+**Blockers:**
+No hard blockers. Three scope questions remain open, and rather than wait on the
+maintainer I decided to keep the change minimal and surface each one in the PR
+description: (1) the issue body claims response schemas are already documented,
+but `docs/API.md` has neither requests nor responses — I documented requests only,
+matching the issue title; (2) two error paths return 500 for invalid client input
+where a 4xx is expected; (3) PDF resume uploads always fail because
+`create_profile_endpoint` passes raw bytes to `PyPDF2.PdfReader`. Both (2) and (3)
+are code defects outside a docs issue, so I documented the observed behavior and
+flagged them for the reviewer instead of widening the diff.
+
+---
+
+### Check-in 2 (end of week)
+
+**PR link:** https://github.com/ascherj/pathreview/pull/685
+
+**Branch:** `docs/89-add-post-request-body-schemas`
+
+**What you built:**
+Added request-body documentation for both POST endpoints to `docs/API.md`, which
+previously described every endpoint with a single line and no request information
+at all. Each endpoint now has its content type, a field table with types and
+required/optional marking, a verified `curl` example, and a table of the error
+responses it actually returns — all observed against a locally running server
+rather than inferred from the source.
+
+**Tests added or updated:**
+Created `tests/unit/test_api_docs.py` with two tests that guard the documentation
+against drifting from the code it describes.
+`test_api_doc_documents_all_profile_request_fields` reads the live signature of
+`create_profile_endpoint` and asserts that each of its form fields
+(`github_username`, `portfolio_url`, `resume_file`) is still both a handler
+parameter and present in `docs/API.md`.
+`test_api_doc_documents_all_review_request_fields` iterates
+`ReviewCreate.model_fields` and asserts every declared field appears in the doc.
+Either test fails if someone changes a request model without updating the API
+reference. Both are marked `pytest.mark.unit` to match the project's marker
+convention so they run under `make test-unit`; the suite went from 375 to 377
+passing with the failure count unchanged at 53.
+
+**Self-review confirmation:** [x] make check passes  [x] make test-unit passes
+
+(This repository has substantial pre-existing failures on `main`. Measured before
+and after my change: `make test-unit` 53 failed / 375 passed → 53 failed / 377
+passed; `ruff` 182 errors → 182 errors; `black --check` 52 files → 52 files;
+`mypy` 5 errors → 5 errors. My change introduces no new failures, and the two
+files I touched are clean under ruff and black individually. Full detail in the
+PR's Notes for Reviewers.)
+
+**Draft PR feedback received from:** none
