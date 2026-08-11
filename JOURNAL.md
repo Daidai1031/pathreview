@@ -327,3 +327,84 @@ files I touched are clean under ruff and black individually. Full detail in the
 PR's Notes for Reviewers.)
 
 **Draft PR feedback received from:** none
+
+
+## Week 10 — Iteration & reflection
+### Reviewer feedback
+
+**Feedback received:** [x] Yes  [ ] No — still awaiting review
+
+**Summary of feedback:**
+Reviewer @ahmadzai38 approved the PR, noting the API documentation was clear
+and that both new tests in `test_api_docs.py` passed locally. They flagged
+one inline typo in `docs/API.md`: the `POST /profiles` description read
+"sCreate a profile..." instead of "Create a profile...".
+
+**How you responded:**
+Fixed the typo in a follow-up commit (`docs(api): fix typo in POST /profiles
+description`) and replied on the review thread confirming the fix. No other
+changes were requested — the PR was already approved before the typo fix.
+
+---
+
+### Reflection
+
+**What was harder than you expected?**
+Scoping the change correctly, not writing it. Once I actually hit both
+endpoints locally, I found three things beyond the missing schemas: two
+error paths returning 500 instead of 4xx for invalid client input (an
+over-length `github_username`, a nonexistent `profile_id`), and PDF resume
+uploads failing 100% of the time because `create_profile_endpoint` passes
+raw `bytes` to `PyPDF2.PdfReader` instead of wrapping it in
+`io.BytesIO()`. All three were tempting to just fix inline — I had already
+traced the exact line — but a docs-only issue isn't the place to widen the
+diff with unrelated behavior changes. Deciding to document the current
+behavior faithfully, flag each one explicitly in the PR, and leave the
+actual fixes for separate issues took more judgment than the schema-writing
+itself.
+
+**What did you learn about working in a large codebase?**
+That the issue description and the actual system can disagree, and you have
+to verify against the running code, not the ticket. Issue #89 says response
+schemas are "already documented," but `docs/API.md` had neither requests
+nor responses for either endpoint — I only found that by reading the file
+myself. Similarly, `POST /profiles` looks like a JSON endpoint from the doc
+prose, but the handler in `api/routes/profiles.py` declares its parameters
+as `Form(...)` and `UploadFile`, and only builds a `ProfileCreate` object
+internally — it's never the request body model. In a solo project I'd never
+hit that gap between "what the code implies" and "what a Pydantic model at
+the route boundary" actually is, because I'd always be the one who wrote
+both.
+
+**How did AI tools help — and where did they fall short?**
+AI was most useful for structure: scaffolding `PLAN.md`, drafting the field
+tables and `curl` examples once I told it the exact wire format, and
+suggesting the drift-detection pattern for `tests/unit/test_api_docs.py`
+(reading `create_profile_endpoint`'s live signature and `ReviewCreate.model_fields`
+instead of hardcoding field names). It fell short anywhere that required
+actually running the server — the multipart-vs-JSON distinction, the four
+undocumented error responses, and the PDF bug were only found by sending
+real requests to `localhost:8000` and reading real responses; no amount of
+reading the route file would have surfaced that `PdfReader(bytes)` fails
+because `bytes` has no `.seek()` without actually triggering the exception.
+
+**What would you do differently if you started over?**
+I'd raise the three scope questions (missing response docs, the 500s, the
+PDF bug) with a mentor as soon as I found them in Week 8, instead of
+resolving all three unilaterally and only surfacing them in the PR
+description. They were reasonable calls, but for a first large-codebase
+contribution I'd rather have a second opinion on "does this belong in my
+PR" before committing to an answer, especially since the issue estimated
+2–3 hours and the actual reproduction work — hitting every endpoint,
+diffing four error paths, tracing the PDF bug to its exact line — took
+considerably longer than that.
+
+**What are you most proud of from this module?**
+The two tests in `test_api_docs.py`, not the documentation itself. Most
+docs-only PRs have no way to stay correct once the code changes again;
+mine reads `create_profile_endpoint`'s actual signature and
+`ReviewCreate.model_fields` at test time and fails if a field is added or
+removed without the doc being updated. Turning a "just prose" issue into
+something that's actually guarded by CI felt like the one place I went
+beyond what the issue literally asked for.
+
