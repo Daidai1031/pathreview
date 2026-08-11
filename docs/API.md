@@ -15,7 +15,7 @@ Base URL: `http://localhost:8000`
 
 ### Profiles
 
-`POST /profiles` — sCreate a profile with resume and GitHub username.
+`POST /profiles` — Create a profile with resume and GitHub username.
 `GET /profiles/{profile_id}` — Retrieve a profile.
 `DELETE /profiles/{profile_id}` — Delete a profile and associated data.
 
